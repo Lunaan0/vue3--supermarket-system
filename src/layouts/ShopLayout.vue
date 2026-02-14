@@ -39,6 +39,9 @@
         <p>&copy; 2024 超市管理系统. All rights reserved.</p>
       </div>
     </el-footer>
+    
+    <!-- AI 购物助手 -->
+    <AiChatWidget />
   </div>
 </template>
 
@@ -48,6 +51,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
+import AiChatWidget from '../components/AiChatWidget/index.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

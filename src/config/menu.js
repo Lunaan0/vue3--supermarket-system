@@ -47,6 +47,12 @@ export const adminMenus = [
     permission: ['ALL', 'OPER']
   },
   {
+    index: '/admin/ai-purchase',
+    title: 'AI采购助手',
+    icon: 'ChatDotRound',
+    permission: ['ALL', 'OPER']
+  },
+  {
     index: 'user-management',
     title: '系统管理',
     icon: 'Setting',

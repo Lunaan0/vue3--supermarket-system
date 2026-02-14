@@ -4,53 +4,84 @@
       <h2>订单管理</h2>
       <div class="header-actions">
         <el-input
-          v-model="searchText"
-          placeholder="搜索订单号或客户"
-          style="width: 200px; margin-right: 10px;"
+          v-model="queryParams.orderNo"
+          placeholder="搜索订单号"
+          style="width: 180px; margin-right: 10px;"
           clearable
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        <el-button type="primary">刷新</el-button>
+        <el-select 
+          v-model="queryParams.orderStatus" 
+          placeholder="订单状态" 
+          clearable 
+          style="width: 120px; margin-right: 10px;">
+          <el-option label="待支付" :value="0" />
+          <el-option label="已支付" :value="1" />
+          <el-option label="已完成" :value="2" />
+          <el-option label="已取消" :value="3" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
+        <el-button @click="handleReset">重置</el-button>
       </div>
     </div>
     
     <el-card>
-      <el-table :data="filteredOrders" style="width: 100%">
-        <el-table-column prop="id" label="订单号" width="120" />
-        <el-table-column prop="customer" label="客户" />
-        <el-table-column prop="phone" label="联系电话" />
-        <el-table-column prop="amount" label="金额">
-          <template #default="scope">
-            <span style="color: #f56c6c; font-weight: bold;">¥{{ scope.row.amount }}</span>
+      <el-table :data="orderList" style="width: 100%" v-loading="loading">
+        <el-table-column prop="orderNo" label="订单号" width="200" />
+        <el-table-column prop="userId" label="用户ID" width="100" />
+        <el-table-column prop="orderAmount" label="订单金额" width="120">
+          <template #default="{ row }">
+            <span style="color: #333;">¥{{ row.orderAmount }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ scope.row.status }}
+        <el-table-column prop="payAmount" label="实付金额" width="120">
+          <template #default="{ row }">
+            <span style="color: #f56c6c; font-weight: bold;">¥{{ row.payAmount }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="订单状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.orderStatus)">
+              {{ getStatusText(row.orderStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="下单时间" width="180" />
+        <el-table-column label="支付状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.payStatus === 1 ? 'success' : 'info'">
+              {{ row.payStatus === 1 ? '已支付' : '未支付' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="支付方式" width="100">
+          <template #default="{ row }">
+            {{ getPayTypeText(row.payType) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="下单时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.createTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200">
-          <template #default="scope">
-            <el-button size="small" @click="viewOrder(scope.row)">查看</el-button>
+          <template #default="{ row }">
+            <el-button size="small" @click="viewOrder(row)">查看</el-button>
             <el-button 
               size="small" 
               type="success" 
-              v-if="scope.row.status === '待发货'"
-              @click="shipOrder(scope.row)"
+              v-if="row.orderStatus === 1"
+              @click="completeOrder(row)"
             >
-              发货
+              完成
             </el-button>
             <el-button 
               size="small" 
               type="danger" 
-              v-if="scope.row.status === '待发货'"
-              @click="cancelOrder(scope.row)"
+              v-if="row.orderStatus === 0 || row.orderStatus === 1"
+              @click="cancelOrder(row)"
             >
               取消
             </el-button>
@@ -60,38 +91,65 @@
       
       <div class="pagination">
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
+          v-model:current-page="queryParams.pageNum"
+          v-model:page-size="queryParams.pageSize"
           :page-sizes="[10, 20, 50, 100]"
-          :total="totalOrders"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
+          @size-change="loadOrders"
+          @current-change="loadOrders"
         />
       </div>
     </el-card>
     
     <!-- 订单详情对话框 -->
-    <el-dialog title="订单详情" v-model="detailDialogVisible" width="600px">
+    <el-dialog title="订单详情" v-model="detailDialogVisible" width="700px">
       <div class="order-detail" v-if="selectedOrder">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="订单号">{{ selectedOrder.id }}</el-descriptions-item>
-          <el-descriptions-item label="客户">{{ selectedOrder.customer }}</el-descriptions-item>
-          <el-descriptions-item label="联系电话">{{ selectedOrder.phone }}</el-descriptions-item>
+          <el-descriptions-item label="订单号">{{ selectedOrder.orderNo }}</el-descriptions-item>
+          <el-descriptions-item label="用户ID">{{ selectedOrder.userId }}</el-descriptions-item>
+          <el-descriptions-item label="订单金额">¥{{ selectedOrder.orderAmount }}</el-descriptions-item>
+          <el-descriptions-item label="实付金额">
+            <span style="color: #f56c6c; font-weight: bold;">¥{{ selectedOrder.payAmount }}</span>
+          </el-descriptions-item>
           <el-descriptions-item label="订单状态">
-            <el-tag :type="getStatusType(selectedOrder.status)">
-              {{ selectedOrder.status }}
+            <el-tag :type="getStatusType(selectedOrder.orderStatus)">
+              {{ selectedOrder.orderStatusText || getStatusText(selectedOrder.orderStatus) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="订单金额">¥{{ selectedOrder.amount }}</el-descriptions-item>
-          <el-descriptions-item label="下单时间">{{ selectedOrder.createTime }}</el-descriptions-item>
-          <el-descriptions-item label="收货地址" :span="2">{{ selectedOrder.address }}</el-descriptions-item>
+          <el-descriptions-item label="支付方式">
+            {{ selectedOrder.payTypeText || getPayTypeText(selectedOrder.payType) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="下单时间">{{ formatDate(selectedOrder.createTime) }}</el-descriptions-item>
+          <el-descriptions-item label="支付时间" v-if="selectedOrder.payTime">
+            {{ formatDate(selectedOrder.payTime) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2" v-if="selectedOrder.remark">
+            {{ selectedOrder.remark }}
+          </el-descriptions-item>
         </el-descriptions>
         
         <h4 style="margin-top: 20px;">商品清单</h4>
-        <el-table :data="selectedOrder.items" style="width: 100%">
-          <el-table-column prop="name" label="商品名称" />
-          <el-table-column prop="price" label="单价" />
-          <el-table-column prop="quantity" label="数量" />
-          <el-table-column prop="subtotal" label="小计" />
+        <el-table :data="selectedOrder.items || []" style="width: 100%">
+          <el-table-column label="商品" min-width="200">
+            <template #default="{ row }">
+              <div class="product-info">
+                <img :src="getImageUrl(row.productImg)" :alt="row.productName" />
+                <span>{{ row.productName }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="sellingPrice" label="单价" width="100">
+            <template #default="{ row }">
+              ¥{{ row.sellingPrice }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="buyQuantity" label="数量" width="80" />
+          <el-table-column label="小计" width="120">
+            <template #default="{ row }">
+              ¥{{ row.discountAmount }}
+            </template>
+          </el-table-column>
         </el-table>
       </div>
     </el-dialog>
@@ -99,106 +157,163 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
+import { getAdminOrderPage, getAdminOrderDetail, completeOrder as completeOrderApi, cancelAdminOrder } from '@/api/order'
 
-const orders = ref([
-  {
-    id: '#2024001',
-    customer: '张三',
-    phone: '13800138001',
-    amount: '256.00',
-    status: '已完成',
-    createTime: '2024-01-30 10:30:00',
-    address: '北京市朝阳区某某街道123号',
-    items: [
-      { name: '红富士苹果', price: '12.80', quantity: 2, subtotal: '25.60' },
-      { name: '纯牛奶', price: '18.50', quantity: 3, subtotal: '55.50' },
-      { name: '全麦面包', price: '8.90', quantity: 2, subtotal: '17.80' }
-    ]
-  },
-  {
-    id: '#2024002',
-    customer: '李四',
-    phone: '13800138002',
-    amount: '189.50',
-    status: '处理中',
-    createTime: '2024-01-30 11:15:00',
-    address: '北京市海淀区某某小区456号',
-    items: [
-      { name: '新鲜鸡蛋', price: '15.60', quantity: 1, subtotal: '15.60' },
-      { name: '红富士苹果', price: '12.80', quantity: 3, subtotal: '38.40' }
-    ]
-  },
-  {
-    id: '#2024003',
-    customer: '王五',
-    phone: '13800138003',
-    amount: '423.80',
-    status: '待发货',
-    createTime: '2024-01-29 15:20:00',
-    address: '北京市西城区某某大楼789号',
-    items: [
-      { name: '纯牛奶', price: '18.50', quantity: 5, subtotal: '92.50' },
-      { name: '全麦面包', price: '8.90', quantity: 4, subtotal: '35.60' }
-    ]
-  }
-])
-
-const searchText = ref('')
-const currentPage = ref(1)
-const pageSize = ref(10)
+const loading = ref(false)
+const orderList = ref([])
+const total = ref(0)
 const detailDialogVisible = ref(false)
 const selectedOrder = ref(null)
 
-const filteredOrders = computed(() => {
-  if (!searchText.value) return orders.value
-  
-  return orders.value.filter(order => 
-    order.id.includes(searchText.value) || 
-    order.customer.includes(searchText.value)
-  )
+const queryParams = ref({
+  pageNum: 1,
+  pageSize: 10,
+  orderNo: '',
+  orderStatus: null,
+  payStatus: null
 })
 
-const totalOrders = computed(() => filteredOrders.value.length)
+// 获取图片URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return ''
+  return `/api${imagePath}`
+}
 
+// 格式化日期
+const formatDate = (date) => {
+  if (!date) return ''
+  return new Date(date).toLocaleString('zh-CN')
+}
+
+// 获取订单状态类型
 const getStatusType = (status) => {
-  const statusMap = {
-    '已完成': 'success',
-    '处理中': 'warning',
-    '待发货': 'info',
-    '已取消': 'danger'
+  const types = {
+    0: 'warning',
+    1: 'primary',
+    2: 'success',
+    3: 'info'
   }
-  return statusMap[status] || 'info'
+  return types[status] || 'info'
 }
 
-const viewOrder = (order) => {
-  selectedOrder.value = order
-  detailDialogVisible.value = true
+// 获取订单状态文本
+const getStatusText = (status) => {
+  const texts = {
+    0: '待支付',
+    1: '已支付',
+    2: '已完成',
+    3: '已取消'
+  }
+  return texts[status] || '未知'
 }
 
-const shipOrder = (order) => {
-  ElMessageBox.confirm('确定要发货这个订单吗？', '提示', {
+// 获取支付方式文本
+const getPayTypeText = (payType) => {
+  const texts = {
+    0: '现金',
+    1: '微信',
+    2: '支付宝',
+    3: '银行卡'
+  }
+  return texts[payType] || '-'
+}
+
+// 加载订单列表
+const loadOrders = async () => {
+  loading.value = true
+  try {
+    const res = await getAdminOrderPage(queryParams.value)
+    if (res.code === 200) {
+      orderList.value = res.data.records || []
+      total.value = res.data.total || 0
+    }
+  } catch (error) {
+    console.error('加载订单失败:', error)
+    ElMessage.error('加载订单失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 搜索
+const handleSearch = () => {
+  queryParams.value.pageNum = 1
+  loadOrders()
+}
+
+// 重置
+const handleReset = () => {
+  queryParams.value = {
+    pageNum: 1,
+    pageSize: 10,
+    orderNo: '',
+    orderStatus: null,
+    payStatus: null
+  }
+  loadOrders()
+}
+
+// 查看订单详情
+const viewOrder = async (order) => {
+  try {
+    const res = await getAdminOrderDetail(order.id)
+    if (res.code === 200) {
+      selectedOrder.value = res.data
+      detailDialogVisible.value = true
+    }
+  } catch (error) {
+    ElMessage.error('获取订单详情失败')
+  }
+}
+
+// 完成订单
+const completeOrder = (order) => {
+  ElMessageBox.confirm('确定将此订单标记为已完成吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    order.status = '处理中'
-    ElMessage.success('订单已发货')
-  })
+  }).then(async () => {
+    try {
+      const res = await completeOrderApi(order.id)
+      if (res.code === 200) {
+        ElMessage.success('订单已完成')
+        loadOrders()
+      } else {
+        ElMessage.error(res.msg || '操作失败')
+      }
+    } catch (error) {
+      ElMessage.error('操作失败')
+    }
+  }).catch(() => {})
 }
 
+// 取消订单
 const cancelOrder = (order) => {
-  ElMessageBox.confirm('确定要取消这个订单吗？', '提示', {
+  ElMessageBox.confirm('确定要取消这个订单吗？库存将会恢复', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    order.status = '已取消'
-    ElMessage.success('订单已取消')
-  })
+  }).then(async () => {
+    try {
+      const res = await cancelAdminOrder(order.id)
+      if (res.code === 200) {
+        ElMessage.success('订单已取消')
+        loadOrders()
+      } else {
+        ElMessage.error(res.msg || '操作失败')
+      }
+    } catch (error) {
+      ElMessage.error('操作失败')
+    }
+  }).catch(() => {})
 }
+
+onMounted(() => {
+  loadOrders()
+})
 </script>
 
 <style scoped>
@@ -230,5 +345,18 @@ const cancelOrder = (order) => {
 
 .order-detail {
   padding: 10px 0;
+}
+
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-info img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
 }
 </style>

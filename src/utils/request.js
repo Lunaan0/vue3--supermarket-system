@@ -26,7 +26,7 @@ const service = axios.create({
   // axios中请求配置有baseURL选项，表示请求URL公共部分
   baseURL: import.meta.env.VITE_APP_BASE_API,
   // 超时
-  timeout: 10000
+  timeout: 100000
 })
 
 // request拦截器
@@ -49,7 +49,7 @@ service.interceptors.request.use(config => {
   if (!isRepeatSubmit && (config.method === 'post' || config.method === 'put')) {
     const requestObj = {
       url: config.url,
-      data: typeof config.data === 'object' ? JSON.stringify(config.data) : config.data,
+      data: config.data || {},  // 处理undefined情况
       time: new Date().getTime()
     }
     const requestSize = Object.keys(JSON.stringify(requestObj)).length; // 请求数据大小
@@ -103,8 +103,8 @@ service.interceptors.response.use(res => {
           isRelogin.show = false;
           removeToken()
           removePermissionCodes()
-          localStorage.removeItem('userRole')
-          localStorage.removeItem('user')
+          // localStorage.removeItem('userRole')
+          // localStorage.removeItem('user')
           location.href = '/login';
       }).catch(() => {
         isRelogin.show = false;

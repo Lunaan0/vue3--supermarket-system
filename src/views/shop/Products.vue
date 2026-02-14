@@ -1,7 +1,7 @@
 <template>
   <div class="shop-products">
     <!-- 顶部导航栏 -->
-    <div class="top-bar"
+    <div class="top-bar">
       <div class="container">
         <div class="logo" @click="goToHome">超市商城</div>
         <div class="search-box">
@@ -38,7 +38,7 @@
                   v-for="category in categories" 
                   :key="category.id" 
                   :index="String(category.id)">
-                  <template #title>
+                  <template #title >
                     <span>{{ category.categoryName }}</span>
                     <el-icon 
                       class="query-icon" 
@@ -301,11 +301,14 @@ const handleCurrentChange = (val) => {
 
 // 加入购物车
 const addToCart = async (product) => {
+  const productId = product.id
+  const quantity = 1
+  console.log('准备加入购物车:', { productId, quantity })
   try {
-    const res = await addToCartApi({
-      productId: product.id,
-      quantity: 1
-    })
+    const res = await addToCartApi(
+      productId,
+      quantity
+    )
     if (res.code === 200) {
       ElMessage.success('已加入购物车')
       loadCartCount()
@@ -320,10 +323,10 @@ const addToCart = async (product) => {
 // 立即购买
 const buyNow = async (product) => {
   try {
-    const res = await addToCartApi({
-      productId: product.id,
-      quantity: 1
-    })
+    const res = await addToCartApi(
+      product.id,
+      1
+    )
     if (res.code === 200) {
       ElMessage.success('已加入购物车，前往结算')
       // 跳转到购物车

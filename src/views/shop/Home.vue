@@ -198,11 +198,13 @@ const handleSearch = () => {
 
 // 加入购物车
 const addToCart = async (product) => {
+  const productId=product.id
+  const quantity=1
   try {
-    const res = await addToCartApi({
-      productId: product.id,
-      quantity: 1
-    })
+    const res = await addToCartApi(
+      productId,
+      quantity
+    )
     if (res.code === 200) {
       ElMessage.success('已加入购物车')
       loadCartCount()
@@ -445,10 +447,10 @@ onMounted(() => {
 /* 购物车悬浮按钮 */
 .cart-float-btn {
   position: fixed;
-  right: 40px;
-  bottom: 40px;
-  width: 60px;
-  height: 60px;
+  right: 100px;
+  bottom: 20px;
+  width: 50px;
+  height: 50px;
   background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
   border-radius: 50%;
   display: flex;

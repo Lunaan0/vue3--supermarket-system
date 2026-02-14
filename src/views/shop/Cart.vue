@@ -150,6 +150,7 @@ import {
   removeFromCart,
   clearCart 
 } from '@/api/cart'
+import { createOrder, payOrder } from '@/api/order'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -290,12 +291,54 @@ const handleClearCart = async () => {
 }
 
 // 结算
-const handleCheckout = () => {
+const handleCheckout = async () => {
   if (checkedItems.value.length === 0) {
     ElMessage.warning('请选择要结算的商品')
     return
   }
-  ElMessage.success('结算功能开发中...')
+  
+  // 弹出支付方式选择
+  try {
+    const { value: payType } = await ElMessageBox.confirm(
+      `共 ${checkedItems.value.length} 件商品，合计 ¥${totalPrice.value.toFixed(2)}`,
+      '确认结算',
+      {
+        confirmButtonText: '确认支付',
+        cancelButtonText: '取消',
+        type: 'info',
+        distinguishCancelAndClose: true,
+        inputType: 'select'
+      }
+    )
+
+    // 创建订单
+    const cartIds = checkedItems.value.map(item => item.id)
+    const res = await createOrder({
+      cartIds: cartIds,
+      payType: 1, // 默认微信支付
+      remark: ''
+    })
+    
+    if (res.code === 200) {
+      const order = res.data
+      // 模拟支付
+      const payRes = await payOrder(order.id, 1)
+      if (payRes.code === 200) {
+        ElMessage.success('支付成功!')
+        router.push('/shop/orders')
+      } else {
+        ElMessage.warning('订单已创建，请在订单页面完成支付')
+        router.push('/shop/orders')
+      }
+    } else {
+      ElMessage.error(res.msg || '创建订单失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('结算失败:', error)
+      ElMessage.error('结算失败')
+    }
+  }
 }
 
 // 跳转到首页

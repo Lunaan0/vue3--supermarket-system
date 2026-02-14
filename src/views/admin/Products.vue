@@ -1,5 +1,21 @@
 <template>
   <div class="products">
+    <!-- 库存预警提示 -->
+    <el-alert 
+      v-if="lowStockProducts.length > 0"
+      type="warning"
+      :closable="false"
+      style="margin-bottom: 15px;"
+    >
+      <template #title>
+        <div class="stock-alert-title">
+          <el-icon><Warning /></el-icon>
+          <span>库存预警：有 {{ lowStockProducts.length }} 种商品库存不足</span>
+          <el-button type="warning" size="small" link @click="showLowStockDialog">查看详情</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <div class="page-header">
       <h2>商品管理</h2>
       <div class="header-actions">
@@ -101,9 +117,20 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="stock" label="库存" width="80">
+        <el-table-column prop="stock" label="库存" width="100">
           <template #default="scope">
-            <span :class="{ 'low-stock': scope.row.stock < 10 }">{{ scope.row.stock || 0 }}</span>
+            <div class="stock-cell">
+              <span :class="{ 'low-stock': scope.row.stock < (scope.row.warningQuantity || 10) }">
+                {{ scope.row.stock || 0 }}
+              </span>
+              <el-tooltip 
+                v-if="scope.row.stock < (scope.row.warningQuantity || 10)" 
+                content="库存不足，请及时补货！" 
+                placement="top"
+              >
+                <el-icon class="warning-icon"><Warning /></el-icon>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
@@ -264,22 +291,59 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="商品图片" prop="productImg">
-          <div class="image-upload-container">
-            <el-upload
-              class="image-uploader"
-              :show-file-list="false"
-              :http-request="handleMainImageUpload"
-              accept="image/*"
-            >
-              <img v-if="productForm.productImg" :src="getImageUrl(productForm.productImg)" class="uploaded-image" />
-              <el-icon v-else class="image-uploader-icon"><Plus /></el-icon>
-            </el-upload>
-            <el-button v-if="productForm.productImg" type="danger" size="small" @click="productForm.productImg = ''">
-              删除
-            </el-button>
-          </div>
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="商品图片" prop="productImg">
+              <div class="image-upload-container">
+                <el-upload
+                  class="image-uploader"
+                  :show-file-list="false"
+                  :http-request="handleMainImageUpload"
+                  accept="image/*"
+                >
+                  <img v-if="productForm.productImg" :src="getImageUrl(productForm.productImg)" class="uploaded-image" />
+                  <el-icon v-else class="image-uploader-icon"><Plus /></el-icon>
+                </el-upload>
+                <el-button v-if="productForm.productImg" type="danger" size="small" @click="productForm.productImg = ''">
+                  删除
+                </el-button>
+              </div>
+            </el-form-item>
+            </el-col>
+            <el-col :span="12">
+            <el-form-item label="库存" prop="stock">
+              <el-input-number 
+                v-model="productForm.stock" 
+                :precision="0" 
+                :step="1" 
+                :min="0" 
+                style="width: 100%" 
+                placeholder="请输入库存"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="预警数量" prop="warningQuantity">
+              <el-input-number 
+                v-model="productForm.warningQuantity" 
+                :precision="0" 
+                :step="1" 
+                :min="0" 
+                style="width: 100%" 
+                placeholder="库存低于此值时预警"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <div class="warning-tip" v-if="productForm.stock < productForm.warningQuantity && productForm.warningQuantity > 0">
+              <el-icon><Warning /></el-icon>
+              <span>当前库存低于预警值！</span>
+            </div>
+          </el-col>
+        </el-row>
+
         <el-form-item label="轮播图" prop="subImage">
           <div class="sub-images-container">
             <el-upload
@@ -357,8 +421,12 @@
         </el-descriptions-item>
         <el-descriptions-item label="折扣">{{ detailData.discount ? (detailData.discount * 10) + '折' : '无折扣' }}</el-descriptions-item>
         <el-descriptions-item label="库存">
-          <span :class="{ 'low-stock': detailData.stock < 10 }">{{ detailData.stock || 0 }}</span>
+          <span :class="{ 'low-stock': detailData.stock < (detailData.warningQuantity || 10) }">
+            {{ detailData.stock || 0 }}
+            <el-icon v-if="detailData.stock < (detailData.warningQuantity || 10)" class="warning-icon" style="color: #E6A23C;"><Warning /></el-icon>
+          </span>
         </el-descriptions-item>
+        <el-descriptions-item label="预警数量">{{ detailData.warningQuantity || 10 }}</el-descriptions-item>
         <el-descriptions-item label="销量">{{ detailData.sales || 0 }}</el-descriptions-item>
         <el-descriptions-item label="商品状态">
           <el-tag :type="detailData.status === 1 ? 'success' : 'danger'" size="small">
@@ -375,13 +443,49 @@
         <el-button type="primary" @click="showEditFromDetail">编辑</el-button>
       </template>
     </el-dialog>
+
+    <!-- 库存预警弹窗 -->
+    <el-dialog title="库存预警商品" v-model="lowStockDialogVisible" width="800px">
+      <el-table :data="lowStockProducts" style="width: 100%">
+        <el-table-column prop="productName" label="商品名称" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="productCode" label="商品编码" width="130" />
+        <el-table-column label="当前库存" width="100">
+          <template #default="{ row }">
+            <span class="low-stock">{{ row.stock || 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="预警数量" width="100">
+          <template #default="{ row }">
+            {{ row.warningQuantity || 10 }}
+          </template>
+        </el-table-column>
+        <el-table-column label="差额" width="100">
+          <template #default="{ row }">
+            <span class="low-stock">
+              -{{ (row.warningQuantity || 10) - row.stock }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="供应商" prop="supplierName" width="130" show-overflow-tooltip />
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="showEditDialog(row)">
+              补货
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="lowStockDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Delete, Edit, View, Picture } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Delete, Edit, View, Picture, Warning } from '@element-plus/icons-vue'
 import { getProductPage, getProductDetail, addProduct, updateProduct, deleteProduct, batchDeleteProduct, updateProductStatus } from '@/api/product'
 import { getCategoryTree } from '@/api/category'
 import { getSupplierList } from '@/api/supplier'
@@ -453,9 +557,10 @@ const productForm = reactive({
   sellingPrice: null,
   status: 1,
   remark: '',
-  stock: null,
+  stock: 0,
+  warningQuantity: 10,
   subImage: '',
-  discount: null,
+  discount: 0,
   description: ''
 })
 
@@ -478,6 +583,19 @@ const allImages = computed(() => {
   }
   return images
 })
+
+// 库存预警商品
+const lowStockProducts = computed(() => {
+  return productList.value.filter(p => p.stock < (p.warningQuantity || 10))
+})
+
+// 库存预警弹窗
+const lowStockDialogVisible = ref(false)
+
+// 显示库存预警弹窗
+const showLowStockDialog = () => {
+  lowStockDialogVisible.value = true
+}
 
 // 获取商品列表
 const getProductList = async () => {
@@ -788,9 +906,9 @@ const resetForm = () => {
     sellingPrice: null,
     status: 1,
     remark: '',
-    stock: null,
+    stock: 0,
     subImage: '',
-    discount: null,
+    discount: 0,
     description: ''
   })
   if (productFormRef.value) {
@@ -856,6 +974,39 @@ onMounted(() => {
 .low-stock {
   color: #f56c6c;
   font-weight: bold;
+}
+
+.stock-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.warning-icon {
+  color: #E6A23C;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.stock-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning-tip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #E6A23C;
+  padding: 10px;
+  background: #fdf6ec;
+  border-radius: 4px;
+  margin-top: 30px;
 }
 
 .price {

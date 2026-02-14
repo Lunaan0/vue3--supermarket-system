@@ -1,11 +1,13 @@
 import request from '@/utils/request'
+import { getToken } from '@/utils/auth'
 
 // 添加到购物车
-export function addToCart(data) {
+export function addToCart(productId, quantity) {
+  console.log('购物车请求参数:', { productId, quantity })
   return request({
-    url: '/shop/cart/add',
+    url: `/shop/cart/add/${productId}/${quantity}`,
     method: 'post',
-    data
+    // data: {}
   })
 }
 

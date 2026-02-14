@@ -56,7 +56,7 @@ const publicRoutes = [
       {
         path: 'orders',
         name: 'ShopOrders',
-        component: () => import('../views/shop/Home.vue'),  // TODO: 创建订单页面
+        component: () => import('../views/shop/Orders.vue'),
         meta: { title: '我的订单', requiresAuth: true }
       }
     ]
@@ -129,6 +129,12 @@ const adminRoutes = [
         name: 'Employees',
         component: () => import('../views/admin/Employees.vue'),
         meta: { requiresAuth: true, permissions: ['ALL'], title: '员工管理' }  // 只有管理员可访问
+      },
+      {
+        path: 'ai-purchase',
+        name: 'AiPurchase',
+        component: () => import('../views/admin/AiPurchase.vue'),
+        meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: 'AI采购助手' }
       }
     ]
   }

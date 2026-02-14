@@ -17,8 +17,8 @@ function getRoleByPermission(permissionCodes) {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: getToken() || null,
-    user: JSON.parse(localStorage.getItem('user') || 'null'),
-    userRole: localStorage.getItem('userRole') || null,
+    // user: JSON.parse(localStorage.getItem('user') || 'null'),
+    // userRole: localStorage.getItem('userRole') || null,
     permissionCodes: getPermissionCodes()  // 从 Cookie 获取
   }),
 
