@@ -35,14 +35,14 @@
             </div>
             <div class="history-list">
               <div
-                v-for="(session, index) in sessionList"
-                :key="session"
+                v-for="session in sessionList"
+                :key="session.sessionId"
                 class="history-item"
-                :class="{ active: currentSessionId === session }"
-                @click="loadSession(session)"
+                :class="{ active: currentSessionId === session.sessionId }"
+                @click="loadSession(session.sessionId)"
               >
                 <el-icon><ChatLineSquare /></el-icon>
-                <span>对话 {{ sessionList.length - index }}</span>
+                <span class="session-title" :title="session.title">{{ session.title || '新对话' }}</span>
               </div>
               <el-empty v-if="sessionList.length === 0" description="暂无历史" :image-size="60" />
             </div>
@@ -82,13 +82,7 @@
             <div class="bubble-content" v-html="formatMessage(msg.content)"></div>
           </div>
 
-          <!-- 加载中 -->
-          <div v-if="loading" class="message-bubble assistant">
-            <div class="bubble-avatar">🤖</div>
-            <div class="bubble-content typing-dots">
-              <span></span><span></span><span></span>
-            </div>
-          </div>
+          <!-- 加载中状态已整合到流式消息中，不需要单独的加载框 -->
         </div>
 
         <!-- 输入区域 -->
@@ -116,7 +110,7 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Service, Close, RefreshRight, Clock, ChatLineSquare, Promotion } from '@element-plus/icons-vue'
-import { sendShopMessage, getShopChatHistory, getShopSessionList } from '@/api/aiChat'
+import { sendShopMessage, sendShopMessageStream, getShopChatHistory, getShopSessionList } from '@/api/aiChat'
 import { marked } from 'marked'
 
 const isOpen = ref(false)
@@ -174,7 +168,7 @@ const loadSession = async (sessionId) => {
   }
 }
 
-// 发送消息
+// 发送消息 - 使用流式输出
 const sendMessage = async () => {
   const message = inputMessage.value.trim()
   if (!message || loading.value) return
@@ -187,38 +181,59 @@ const sendMessage = async () => {
     createTime: new Date()
   })
   inputMessage.value = ''
-  
   await nextTick()
   scrollToBottom()
 
   loading.value = true
-  try {
-    const res = await sendShopMessage({
-      sessionId: currentSessionId.value || null,
-      message: message
-    })
-    
-    if (res.code === 200) {
-      currentSessionId.value = res.data.sessionId
-      
-      messages.value.push({
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: res.data.reply,
-        createTime: new Date()
-      })
-      
+
+  // 创建 AI 回复占位消息
+  const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: '', createTime: new Date() }
+  messages.value.push(assistantMsg)
+
+  const payload = { sessionId: currentSessionId.value || null, message }
+
+  // 使用流式 API
+  sendShopMessageStream(
+    payload,
+    // onChunk - 每收到一段内容
+    (chunk) => {
+      assistantMsg.content += chunk
+      nextTick().then(scrollToBottom)
+    },
+    // onComplete - 流式结束
+    (fullContent) => {
+      loading.value = false
       loadSessionList()
-    } else {
-      ElMessage.error(res.msg || '发送失败')
+    },
+    // onError - 出错时回退到非流式
+    async (error) => {
+      console.error('流式请求失败，回退到普通请求:', error)
+      // 移除空的占位消息
+      const idx = messages.value.findIndex(m => m.id === assistantMsg.id)
+      if (idx > -1 && !assistantMsg.content) {
+        messages.value.splice(idx, 1)
+      }
+      // 回退到非流式
+      try {
+        const res = await sendShopMessage({ sessionId: currentSessionId.value || null, message })
+        if (res.code === 200) {
+          currentSessionId.value = res.data.sessionId
+          messages.value.push({ id: Date.now() + 2, role: 'assistant', content: res.data.reply, createTime: new Date() })
+          loadSessionList()
+        } else {
+          ElMessage.error(res.msg || '发送失败')
+        }
+      } catch (e) {
+        ElMessage.error('发送消息失败')
+      } finally {
+        loading.value = false
+      }
+    },
+    // onSession - 收到 sessionId
+    (sessionId) => {
+      currentSessionId.value = sessionId
     }
-  } catch (error) {
-    ElMessage.error('发送消息失败')
-  } finally {
-    loading.value = false
-    await nextTick()
-    scrollToBottom()
-  }
+  )
 }
 
 // 快捷消息
@@ -369,6 +384,13 @@ watch(messages, (newVal, oldVal) => {
   cursor: pointer;
   margin-bottom: 8px;
   background: #f5f7fa;
+}
+
+.history-item .session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-item:hover {

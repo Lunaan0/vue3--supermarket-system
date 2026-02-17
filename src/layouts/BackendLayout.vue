@@ -42,11 +42,19 @@
             <span class="welcome">欢迎，{{ roleText }}</span>
             <el-dropdown @command="handleCommand">
               <span class="el-dropdown-link">
-                {{ user?.username || user?.account }}
+                <el-avatar 
+                  :size="32" 
+                  :src="userAvatarUrl" 
+                  class="header-avatar"
+                >
+                  <el-icon :size="16"><User /></el-icon>
+                </el-avatar>
+                <span class="header-username">{{ userProfile.realName || user?.username || user?.account }}</span>
                 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                   <el-dropdown-item command="logout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -63,11 +71,12 @@
 </template>
 
 <script setup>
-import { computed, markRaw } from 'vue'
+import { computed, markRaw, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { adminMenus, filterMenusByPermission } from '@/config/menu'
+import { getUserProfile } from '@/api/profile'
 import { 
   House, 
   User, 
@@ -105,6 +114,32 @@ const authStore = useAuthStore()
 const user = computed(() => authStore.user)
 const permissionCodes = computed(() => authStore.permissionCodes)
 
+// 用户个人信息（头像、真实名字等）
+const userProfile = ref({})
+const baseUrl = import.meta.env.VITE_APP_BASE_API
+
+const userAvatarUrl = computed(() => {
+  const avatar = userProfile.value.avatar
+  if (!avatar) return ''
+  if (avatar.startsWith('http')) return avatar
+  return baseUrl + avatar
+})
+
+const loadUserProfile = async () => {
+  try {
+    const res = await getUserProfile()
+    if (res.code === 200) {
+      userProfile.value = res.data || {}
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadUserProfile()
+})
+
 // 根据权限过滤菜单
 const filteredMenus = computed(() => {
   // 深拷贝菜单配置，避免修改原数据
@@ -124,6 +159,8 @@ const handleCommand = async (command) => {
     await authStore.logout()
     ElMessage.success('退出登录成功')
     router.push('/login')
+  } else if (command === 'profile') {
+    router.push('/admin/profile')
   }
 }
 </script>
@@ -196,6 +233,21 @@ const handleCommand = async (command) => {
   color: #333;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.header-avatar {
+  flex-shrink: 0;
+  border: 2px solid #409EFF;
+}
+
+.header-username {
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main {

@@ -22,17 +22,17 @@
           </template>
           <div class="session-list" v-loading="sessionLoading">
             <div
-              v-for="(session, index) in sessionList"
-              :key="session"
+              v-for="session in sessionList"
+              :key="session.sessionId"
               class="session-item"
-              :class="{ active: currentSessionId === session }"
-              @click="loadSession(session)"
+              :class="{ active: currentSessionId === session.sessionId }"
+              @click="loadSession(session.sessionId)"
             >
               <el-icon><ChatLineSquare /></el-icon>
-              <span>对话 {{ sessionList.length - index }}</span>
+              <span class="session-title" :title="session.title">{{ session.title || '新对话' }}</span>
               <el-icon 
                 class="delete-btn" 
-                @click.stop="deleteSession(session)"
+                @click.stop="deleteSession(session.sessionId)"
               >
                 <Delete />
               </el-icon>
@@ -84,17 +84,7 @@
               </div>
             </div>
 
-            <!-- 加载中 -->
-            <div v-if="loading" class="message-item assistant">
-              <div class="message-avatar">
-                <el-icon :size="24"><Cpu /></el-icon>
-              </div>
-              <div class="message-content">
-                <div class="message-text typing">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-            </div>
+            <!-- 加载中状态已整合到流式消息中，不需要单独的加载框 -->
           </div>
 
           <!-- 输入区域 -->
@@ -128,7 +118,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotRound, Plus, ChatLineSquare, Delete, Cpu, User, Promotion } from '@element-plus/icons-vue'
-import { sendPurchaseMessage, getPurchaseChatHistory, getPurchaseSessionList, deletePurchaseSession } from '@/api/aiChat'
+import { sendPurchaseMessage, sendPurchaseMessageStream, getPurchaseChatHistory, getPurchaseSessionList, deletePurchaseSession } from '@/api/aiChat'
 import { marked } from 'marked'
 
 const sessionList = ref([])
@@ -199,53 +189,67 @@ const deleteSession = async (sessionId) => {
   }
 }
 
-// 发送消息
+// 发送消息 - 使用流式输出
 const sendMessage = async () => {
   const message = inputMessage.value.trim()
   if (!message || loading.value) return
 
-  // 添加用户消息到界面
-  messages.value.push({
-    id: Date.now(),
-    role: 'user',
-    content: message,
-    createTime: new Date()
-  })
+  // 添加用户消息
+  messages.value.push({ id: Date.now(), role: 'user', content: message, createTime: new Date() })
   inputMessage.value = ''
-  
   await nextTick()
   scrollToBottom()
 
   loading.value = true
-  try {
-    const res = await sendPurchaseMessage({
-      sessionId: currentSessionId.value || null,
-      message: message
-    })
-    
-    if (res.code === 200) {
-      currentSessionId.value = res.data.sessionId
-      
-      // 添加AI回复
-      messages.value.push({
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: res.data.reply,
-        createTime: new Date()
-      })
-      
-      // 刷新会话列表
+
+  // 创建 AI 回复占位消息
+  const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: '', createTime: new Date() }
+  messages.value.push(assistantMsg)
+
+  const payload = { sessionId: currentSessionId.value || null, message }
+
+  // 使用流式 API
+  sendPurchaseMessageStream(
+    payload,
+    // onChunk - 每收到一段内容
+    (chunk) => {
+      assistantMsg.content += chunk
+      nextTick().then(scrollToBottom)
+    },
+    // onComplete - 流式结束
+    (fullContent) => {
+      loading.value = false
       loadSessionList()
-    } else {
-      ElMessage.error(res.msg || '发送失败')
+    },
+    // onError - 出错时回退到非流式
+    async (error) => {
+      console.error('流式请求失败，回退到普通请求:', error)
+      // 移除空的占位消息
+      const idx = messages.value.findIndex(m => m.id === assistantMsg.id)
+      if (idx > -1 && !assistantMsg.content) {
+        messages.value.splice(idx, 1)
+      }
+      // 回退到非流式
+      try {
+        const res = await sendPurchaseMessage({ sessionId: currentSessionId.value || null, message })
+        if (res.code === 200) {
+          currentSessionId.value = res.data.sessionId
+          messages.value.push({ id: Date.now() + 2, role: 'assistant', content: res.data.reply, createTime: new Date() })
+          loadSessionList()
+        } else {
+          ElMessage.error(res.msg || '发送失败')
+        }
+      } catch (e) {
+        ElMessage.error('发送消息失败')
+      } finally {
+        loading.value = false
+      }
+    },
+    // onSession - 收到 sessionId
+    (sessionId) => {
+      currentSessionId.value = sessionId
     }
-  } catch (error) {
-    ElMessage.error('发送消息失败，请稍后重试')
-  } finally {
-    loading.value = false
-    await nextTick()
-    scrollToBottom()
-  }
+  )
 }
 
 // 快捷消息
@@ -330,6 +334,13 @@ onMounted(() => {
   margin-bottom: 8px;
   transition: all 0.3s;
   background: #f5f7fa;
+}
+
+.session-item .session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-item:hover {

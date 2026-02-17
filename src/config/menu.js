@@ -53,6 +53,12 @@ export const adminMenus = [
     permission: ['ALL', 'OPER']
   },
   {
+    index: '/admin/purchase-suggestion',
+    title: '采购建议管理',
+    icon: 'DocumentChecked',
+    permission: ['ALL', 'OPER']
+  },
+  {
     index: 'user-management',
     title: '系统管理',
     icon: 'Setting',

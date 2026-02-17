@@ -16,7 +16,14 @@
         <div class="user-info">
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link">
-              {{ user?.account || '用户' }}
+              <el-avatar 
+                :size="30" 
+                :src="userAvatarUrl" 
+                class="header-avatar"
+              >
+                <el-icon :size="14"><User /></el-icon>
+              </el-avatar>
+              <span class="header-username">{{ userProfile.realName || user?.account || '用户' }}</span>
               <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
@@ -46,17 +53,44 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { ElMessage } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, User } from '@element-plus/icons-vue'
 import AiChatWidget from '../components/AiChatWidget/index.vue'
+import { getUserProfile } from '@/api/profile'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const user = computed(() => authStore.user)
+
+// 用户个人信息
+const userProfile = ref({})
+const baseUrl = import.meta.env.VITE_APP_BASE_API
+
+const userAvatarUrl = computed(() => {
+  const avatar = userProfile.value.avatar
+  if (!avatar) return ''
+  if (avatar.startsWith('http')) return avatar
+  return baseUrl + avatar
+})
+
+const loadUserProfile = async () => {
+  try {
+    const res = await getUserProfile()
+    if (res.code === 200) {
+      userProfile.value = res.data || {}
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadUserProfile()
+})
 
 const handleCommand = (command) => {
   if (command === 'logout') {
@@ -114,6 +148,21 @@ const handleCommand = (command) => {
   color: #333;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.header-avatar {
+  flex-shrink: 0;
+  border: 2px solid #409EFF;
+}
+
+.header-username {
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main {

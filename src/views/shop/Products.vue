@@ -98,8 +98,8 @@
                       <div class="product-name" :title="product.productName">
                         {{ product.productName }}
                       </div>
-                      <div class="product-desc" v-if="product.description">
-                        {{ product.description }}
+                      <div class="product-desc">
+                        {{ product.description || '暂无描述' }}
                       </div>
                       <div class="product-price-row">
                         <span class="current-price">¥{{ product.sellingPrice }}</span>
@@ -535,6 +535,9 @@ onMounted(() => {
 
 .product-info {
   padding: 12px;
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
 }
 
 .product-name {
@@ -545,6 +548,7 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  height: 20px;
 }
 
 .product-desc {
@@ -554,6 +558,8 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .product-price-row {

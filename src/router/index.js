@@ -50,7 +50,7 @@ const publicRoutes = [
       {
         path: 'profile',
         name: 'UserProfile',
-        component: () => import('../views/shop/Home.vue'),  // TODO: 创建个人中心页面
+        component: () => import('../views/Profile.vue'),
         meta: { title: '个人中心', requiresAuth: true }
       },
       {
@@ -135,6 +135,18 @@ const adminRoutes = [
         name: 'AiPurchase',
         component: () => import('../views/admin/AiPurchase.vue'),
         meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: 'AI采购助手' }
+      },
+      {
+        path: 'purchase-suggestion',
+        name: 'PurchaseSuggestion',
+        component: () => import('../views/admin/PurchaseSuggestion.vue'),
+        meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: '采购建议管理' }
+      },
+      {
+        path: 'profile',
+        name: 'AdminProfile',
+        component: () => import('../views/Profile.vue'),
+        meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: '个人中心' }
       }
     ]
   }
