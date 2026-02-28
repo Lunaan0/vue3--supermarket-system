@@ -158,9 +158,20 @@
             </template>
           </el-table-column>
           <el-table-column prop="buyQuantity" label="数量" width="80" />
+          <el-table-column label="折扣" width="80">
+            <template #default="{ row }">
+              <el-tag v-if="row.memberDiscount && row.memberDiscount < 1" type="warning" size="small">
+                {{ (row.memberDiscount * 10).toFixed(1) }}折
+              </el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="小计" width="120">
             <template #default="{ row }">
-              ¥{{ row.discountAmount }}
+              <span class="discount-price">¥{{ row.discountAmount }}</span>
+              <div v-if="row.memberDiscount && row.memberDiscount < 1" class="original-price-small">
+                原价: ¥{{ row.totalAmount }}
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -380,7 +391,7 @@ onMounted(() => {
 <style scoped>
 .shop-orders {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f5f7fc;
 }
 
 .container {
@@ -391,10 +402,10 @@ onMounted(() => {
 
 /* 顶部导航栏 */
 .top-bar {
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
+  background: linear-gradient(135deg, #667eea 0%, #9b8dd4 60%, #c4a0d4 100%);
   color: white;
   padding: 15px 0;
-  box-shadow: 0 2px 8px rgba(255, 119, 48, 0.2);
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.25);
 }
 
 .top-bar .container {
@@ -404,10 +415,11 @@ onMounted(() => {
 }
 
 .logo {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 800;
   letter-spacing: 2px;
   cursor: pointer;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
 
 .nav-links {
@@ -422,6 +434,7 @@ onMounted(() => {
 
 .user-info {
   font-size: 14px;
+  opacity: 0.9;
 }
 
 /* 订单内容 */
@@ -432,15 +445,17 @@ onMounted(() => {
 .page-title {
   font-size: 28px;
   margin: 0 0 20px 0;
-  color: #333;
+  color: #2d3142;
+  font-weight: 700;
 }
 
 /* 订单标签 */
 .order-tabs {
   background: white;
   padding: 10px 20px;
-  border-radius: 8px;
+  border-radius: 14px;
   margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
 }
 
 /* 订单列表 */
@@ -450,10 +465,10 @@ onMounted(() => {
 
 .order-card {
   background: white;
-  border-radius: 8px;
+  border-radius: 14px;
   margin-bottom: 20px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
 }
 
 .order-header {
@@ -461,8 +476,8 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: #f9f9f9;
-  border-bottom: 1px solid #e0e0e0;
+  background: #f5f7fc;
+  border-bottom: 1px solid #eef0f8;
 }
 
 .order-info {
@@ -472,11 +487,11 @@ onMounted(() => {
 
 .order-no {
   font-weight: bold;
-  color: #333;
+  color: #2d3142;
 }
 
 .order-time {
-  color: #999;
+  color: #9a9eb8;
   font-size: 14px;
 }
 
@@ -489,7 +504,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed #eef0f8;
 }
 
 .order-item:last-child {
@@ -500,7 +515,7 @@ onMounted(() => {
   width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
   margin-right: 15px;
 }
 
@@ -510,13 +525,13 @@ onMounted(() => {
 
 .item-name {
   font-size: 14px;
-  color: #333;
+  color: #2d3142;
   margin-bottom: 5px;
 }
 
 .item-spec {
   font-size: 12px;
-  color: #999;
+  color: #9a9eb8;
 }
 
 .item-price {
@@ -528,7 +543,7 @@ onMounted(() => {
 }
 
 .quantity {
-  color: #999;
+  color: #9a9eb8;
   font-size: 12px;
 }
 
@@ -537,18 +552,18 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: #f9f9f9;
-  border-top: 1px solid #e0e0e0;
+  background: #f5f7fc;
+  border-top: 1px solid #eef0f8;
 }
 
 .order-total {
-  color: #666;
+  color: #6b7280;
 }
 
 .pay-amount {
   font-size: 20px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 .order-actions {
@@ -574,7 +589,18 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+.discount-price {
+  color: #e74860;
+  font-weight: 600;
+}
+
+.original-price-small {
+  font-size: 12px;
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
 /* 支付弹窗 */
@@ -589,8 +615,8 @@ onMounted(() => {
 
 .pay-amount-info .amount {
   font-size: 32px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 .pay-methods {
@@ -602,8 +628,8 @@ onMounted(() => {
 .pay-method {
   width: 100px;
   height: 80px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid #eef0f8;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -613,12 +639,12 @@ onMounted(() => {
 }
 
 .pay-method:hover {
-  border-color: #ff7730;
+  border-color: #667eea;
 }
 
 .pay-method.active {
-  border-color: #ff7730;
-  background-color: rgba(255, 119, 48, 0.1);
+  border-color: #667eea;
+  background-color: rgba(102, 126, 234, 0.08);
 }
 
 .pay-method span {

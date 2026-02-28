@@ -145,9 +145,20 @@
             </template>
           </el-table-column>
           <el-table-column prop="buyQuantity" label="数量" width="80" />
+          <el-table-column label="折扣" width="80">
+            <template #default="{ row }">
+              <el-tag v-if="row.memberDiscount && row.memberDiscount < 1" type="warning" size="small">
+                {{ (row.memberDiscount * 10).toFixed(1) }}折
+              </el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="小计" width="120">
             <template #default="{ row }">
-              ¥{{ row.discountAmount }}
+              <span style="color: #f56c6c; font-weight: 600;">¥{{ row.discountAmount }}</span>
+              <div v-if="row.memberDiscount && row.memberDiscount < 1" style="font-size: 12px; color: #9ca3af; text-decoration: line-through;">
+                原价: ¥{{ row.totalAmount }}
+              </div>
             </template>
           </el-table-column>
         </el-table>

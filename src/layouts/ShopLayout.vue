@@ -6,11 +6,12 @@
           <h2>超市商城</h2>
         </div>
         <div class="nav-menu">
-          <el-menu mode="horizontal" :default-active="$route.path" router>
+          <el-menu mode="horizontal" :default-active="$route.path" router :ellipsis="false">
             <el-menu-item index="/shop/home">首页</el-menu-item>
             <el-menu-item index="/shop/products">商品</el-menu-item>
             <el-menu-item index="/shop/cart">购物车</el-menu-item>
             <el-menu-item index="/shop/orders">订单</el-menu-item>
+            <el-menu-item index="/shop/member">会员中心</el-menu-item>
           </el-menu>
         </div>
         <div class="user-info">
@@ -112,8 +113,11 @@ const handleCommand = (command) => {
 
 .header {
   background-color: #fff;
-  border-bottom: 1px solid #e6e6e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #eef0f8;
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .header-content {
@@ -121,39 +125,93 @@ const handleCommand = (command) => {
   align-items: center;
   justify-content: space-between;
   height: 60px;
-  padding: 0 20px;
+  padding: 0 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .logo h2 {
   margin: 0;
-  color: #409EFF;
-  font-size: 24px;
+  font-size: 22px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 1px;
+  cursor: pointer;
 }
 
 .nav-menu {
-  /* flex: 1; */
-  min-width: 500px;
+  flex: 1;
   display: flex;
   justify-content: center;
 }
 
+/* 覆盖 el-menu 默认样式，确保所有菜单项展示 */
+.nav-menu :deep(.el-menu) {
+  border-bottom: none;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: visible !important;
+}
+
+/* 禁用 el-menu 的溢出折叠机制 */
+.nav-menu :deep(.el-menu--horizontal) {
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+}
+
+/* 确保所有菜单项始终可见，不被折叠 */
+.nav-menu :deep(.el-menu--horizontal > .el-menu-item) {
+  font-size: 15px;
+  font-weight: 500;
+  color: #4a4e6a;
+  padding: 0 20px;
+  height: 60px;
+  line-height: 60px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.nav-menu :deep(.el-menu--horizontal > .el-menu-item:hover) {
+  color: #667eea;
+  background: transparent;
+}
+
+.nav-menu :deep(.el-menu--horizontal > .el-menu-item.is-active) {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: transparent;
+}
+
+/* 隐藏省略号按钮(el-menu-overflow的more子菜单) */
+.nav-menu :deep(.el-menu--horizontal > .el-sub-menu) {
+  display: none !important;
+}
+
 .user-info {
   margin-left: 20px;
+  flex-shrink: 0;
 }
 
 .el-dropdown-link {
   cursor: pointer;
-  color: #333;
+  color: #4a4e6a;
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: color 0.3s;
+}
+
+.el-dropdown-link:hover {
+  color: #667eea;
 }
 
 .header-avatar {
   flex-shrink: 0;
-  border: 2px solid #409EFF;
+  border: 2px solid #a5b4fc;
 }
 
 .header-username {
@@ -167,13 +225,13 @@ const handleCommand = (command) => {
 
 .main {
   flex: 1;
-  background-color: #f5f5f5;
-  padding: 20px;
+  background-color: #f5f7fc;
+  padding: 0;
 }
 
 .footer {
-  background-color: #333;
-  color: white;
+  background: linear-gradient(135deg, #2d3142 0%, #4a4e6a 100%);
+  color: rgba(255, 255, 255, 0.85);
   padding: 20px 0;
 }
 
@@ -186,5 +244,6 @@ const handleCommand = (command) => {
 
 .footer-content p {
   margin: 0;
+  font-size: 13px;
 }
 </style>

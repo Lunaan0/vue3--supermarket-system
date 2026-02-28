@@ -47,6 +47,12 @@ export const adminMenus = [
     permission: ['ALL', 'OPER']
   },
   {
+    index: '/admin/member-levels',
+    title: '会员等级配置',
+    icon: 'Medal',
+    permission: ['ALL', 'OPER']
+  },
+  {
     index: '/admin/ai-purchase',
     title: 'AI采购助手',
     icon: 'ChatDotRound',
@@ -59,7 +65,7 @@ export const adminMenus = [
     permission: ['ALL', 'OPER']
   },
   {
-    index: 'user-management',
+    index: '/admin/system',
     title: '系统管理',
     icon: 'Setting',
     permission: ['ALL'],  // 只有管理员可见

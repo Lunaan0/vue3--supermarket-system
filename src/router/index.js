@@ -58,6 +58,18 @@ const publicRoutes = [
         name: 'ShopOrders',
         component: () => import('../views/shop/Orders.vue'),
         meta: { title: '我的订单', requiresAuth: true }
+      },
+      {
+        path: 'member',
+        name: 'MemberCenter',
+        component: () => import('../views/shop/MemberCenter.vue'),
+        meta: { title: '会员中心', requiresAuth: true }
+      },
+      {
+        path: 'product/:id',
+        name: 'ProductDetail',
+        component: () => import('../views/shop/ProductDetail.vue'),
+        meta: { title: '商品详情' }
       }
     ]
   }
@@ -117,6 +129,12 @@ const adminRoutes = [
         name: 'Members',
         component: () => import('../views/admin/Members.vue'),
         meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: '会员管理' }
+      },
+      {
+        path: 'member-levels',
+        name: 'MemberLevels',
+        component: () => import('../views/admin/MemberLevels.vue'),
+        meta: { requiresAuth: true, permissions: ['ALL', 'OPER'], title: '会员等级配置' }
       },
       {
         path: 'users',

@@ -87,7 +87,9 @@ import {
   UserFilled, 
   Setting,
   Van,
-  ArrowDown
+  ArrowDown,
+  ChatDotRound,
+  DocumentChecked
 } from '@element-plus/icons-vue'
 
 // 图标映射
@@ -100,7 +102,9 @@ const iconMap = {
   Box: markRaw(Box),
   UserFilled: markRaw(UserFilled),
   Setting: markRaw(Setting),
-  Van: markRaw(Van)
+  Van: markRaw(Van),
+  ChatDotRound: markRaw(ChatDotRound),
+  DocumentChecked: markRaw(DocumentChecked)
 }
 
 // 获取图标组件
@@ -183,6 +187,36 @@ const handleCommand = async (command) => {
 
 .sidebar .el-menu {
   border-right: none;
+}
+
+/* 确保菜单图标始终显示 - 更强制的样式 */
+:deep(.el-menu-item),
+:deep(.el-sub-menu__title) {
+  display: flex !important;
+  align-items: center !important;
+}
+
+:deep(.el-menu-item .el-icon),
+:deep(.el-sub-menu__title .el-icon) {
+  margin-right: 8px !important;
+  flex-shrink: 0 !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  font-size: 18px !important;
+}
+
+:deep(.el-menu-item span),
+:deep(.el-sub-menu__title span) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 修复子菜单箭头与图标的冲突 */
+:deep(.el-sub-menu__icon-arrow) {
+  margin-left: auto !important;
+  position: static !important;
 }
 
 .logo {

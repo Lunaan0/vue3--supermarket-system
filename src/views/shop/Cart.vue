@@ -67,7 +67,7 @@
             </div>
             <div class="item-quantity">
               <el-input-number 
-                :model-value="item.quantity"
+                v-model="item.quantity"
                 @change="handleQuantityChange(item, $event)"
                 :min="1"
                 :max="item.stock"
@@ -75,7 +75,7 @@
                 size="small" />
             </div>
             <div class="item-subtotal">
-              <span class="subtotal-price">¥{{ item.subtotal?.toFixed(2) }}</span>
+              <span class="subtotal-price">¥{{ (item.quantity * item.sellingPrice * (item.discount || 1)).toFixed(2) }}</span>
             </div>
             <div class="item-action">
               <el-button 
@@ -119,9 +119,17 @@
               <span class="total-count">{{ checkedItems.length }}</span>
               <span class="total-label">件</span>
             </div>
+            <!-- 会员折扣信息 -->
+            <div v-if="isValidMember" class="member-discount-info">
+              <el-tag type="warning" size="small" class="member-tag">
+                {{ memberInfo.memberLevel }} {{ (memberDiscount * 10).toFixed(1) }}折
+              </el-tag>
+              <span class="original-price">原价: ¥{{ totalPrice.toFixed(2) }}</span>
+              <span class="saved-amount">已省: ¥{{ savedAmount }}</span>
+            </div>
             <div class="total-price-info">
-              <span class="total-label">合计:</span>
-              <span class="total-price">¥{{ totalPrice.toFixed(2) }}</span>
+              <span class="total-label">{{ isValidMember ? '折后价:' : '合计:' }}</span>
+              <span class="total-price">¥{{ discountedTotalPrice }}</span>
             </div>
             <el-button 
               type="primary" 
@@ -151,18 +159,41 @@ import {
   clearCart 
 } from '@/api/cart'
 import { createOrder, payOrder } from '@/api/order'
+import { getCurrentMemberInfo } from '@/api/shopMember'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const userStore = useAuthStore()
 
 const cartList = ref([])
+const memberInfo = ref(null) // 会员信息
 
 // 获取图片URL
 const getImageUrl = (imagePath) => {
   if (!imagePath) return ''
   return `/api${imagePath}`
 }
+
+// 判断会员是否有效（未过期且等级大于0）
+const isValidMember = computed(() => {
+  if (!memberInfo.value || !memberInfo.value.level || memberInfo.value.level === 0) {
+    return false
+  }
+  // 检查是否过期
+  if (memberInfo.value.expireTime) {
+    const expireDate = new Date(memberInfo.value.expireTime)
+    return expireDate > new Date()
+  }
+  return true
+})
+
+// 会员折扣
+const memberDiscount = computed(() => {
+  if (isValidMember.value && memberInfo.value.discount) {
+    return parseFloat(memberInfo.value.discount)
+  }
+  return 1
+})
 
 // 已选中的商品
 const checkedItems = computed(() => {
@@ -181,10 +212,34 @@ const isIndeterminate = computed(() => {
   return checkedItems.value.length > 0 && checkedItems.value.length < validItems.length
 })
 
-// 总价
+// 总价（原价）- 已包含商品折扣
 const totalPrice = computed(() => {
-  return checkedItems.value.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+  return checkedItems.value.reduce((sum, item) => {
+    return sum + (item.quantity * item.sellingPrice * (item.discount || 1))
+  }, 0)
 })
+
+// 折扣后的总价（实际支付金额）
+const discountedTotalPrice = computed(() => {
+  return (totalPrice.value * memberDiscount.value).toFixed(2)
+})
+
+// 节省的金额
+const savedAmount = computed(() => {
+  return (totalPrice.value - parseFloat(discountedTotalPrice.value)).toFixed(2)
+})
+
+// 加载会员信息
+const loadMemberInfo = async () => {
+  try {
+    const res = await getCurrentMemberInfo()
+    if (res.code === 200) {
+      memberInfo.value = res.data
+    }
+  } catch (error) {
+    console.error('加载会员信息失败:', error)
+  }
+}
 
 // 加载购物车列表
 const loadCartList = async () => {
@@ -236,13 +291,17 @@ const handleQuantityChange = async (item, quantity) => {
       quantity: quantity
     })
     if (res.code === 200) {
+      // 静默更新，不显示成功提示
       await loadCartList()
-      ElMessage.success('数量已更新')
     } else {
       ElMessage.error(res.msg || '更新失败')
+      // 失败时恢复原数量
+      await loadCartList()
     }
   } catch (error) {
     ElMessage.error('更新失败')
+    // 失败时恢复原数量
+    await loadCartList()
   }
 }
 
@@ -299,8 +358,19 @@ const handleCheckout = async () => {
   
   // 弹出支付方式选择
   try {
+    // 构建确认消息
+    let confirmMessage = `共 ${checkedItems.value.length} 件商品`
+    if (isValidMember.value) {
+      confirmMessage += `\n原价: ¥${totalPrice.value.toFixed(2)}`
+      confirmMessage += `\n会员折扣: ${(memberDiscount.value * 10).toFixed(1)}折`
+      confirmMessage += `\n实付: ¥${discountedTotalPrice.value}`
+      confirmMessage += `\n已省: ¥${savedAmount.value}`
+    } else {
+      confirmMessage += `\n合计: ¥${discountedTotalPrice.value}`
+    }
+    
     const { value: payType } = await ElMessageBox.confirm(
-      `共 ${checkedItems.value.length} 件商品，合计 ¥${totalPrice.value.toFixed(2)}`,
+      confirmMessage,
       '确认结算',
       {
         confirmButtonText: '确认支付',
@@ -353,13 +423,14 @@ const goToProducts = () => {
 
 onMounted(() => {
   loadCartList()
+  loadMemberInfo()
 })
 </script>
 
 <style scoped>
 .shop-cart {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f5f7fc;
 }
 
 .container {
@@ -370,10 +441,10 @@ onMounted(() => {
 
 /* 顶部导航栏 */
 .top-bar {
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
+  background: linear-gradient(135deg, #667eea 0%, #9b8dd4 60%, #c4a0d4 100%);
   color: white;
   padding: 15px 0;
-  box-shadow: 0 2px 8px rgba(255, 119, 48, 0.2);
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.25);
 }
 
 .top-bar .container {
@@ -383,10 +454,11 @@ onMounted(() => {
 }
 
 .logo {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 800;
   letter-spacing: 2px;
   cursor: pointer;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
 
 .nav-links {
@@ -401,6 +473,7 @@ onMounted(() => {
 
 .user-info {
   font-size: 14px;
+  opacity: 0.9;
 }
 
 /* 购物车内容 */
@@ -411,14 +484,15 @@ onMounted(() => {
 .page-title {
   font-size: 28px;
   margin: 0 0 30px 0;
-  color: #333;
+  color: #2d3142;
+  font-weight: 700;
 }
 
 /* 购物车列表 */
 .cart-list {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
   overflow: hidden;
 }
 
@@ -432,24 +506,24 @@ onMounted(() => {
 }
 
 .cart-header {
-  background: #f5f5f5;
+  background: #f5f7fc;
   font-weight: bold;
-  color: #666;
-  border-bottom: 2px solid #e0e0e0;
+  color: #6b7280;
+  border-bottom: 2px solid #eef0f8;
 }
 
 .cart-item {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #eef0f8;
   transition: background-color 0.3s ease;
 }
 
 .cart-item:hover {
-  background-color: #fafafa;
+  background-color: #fafbff;
 }
 
 .cart-item.out-of-stock {
   opacity: 0.6;
-  background-color: #f9f9f9;
+  background-color: #f9f9fb;
 }
 
 /* 商品信息 */
@@ -463,8 +537,8 @@ onMounted(() => {
   width: 80px;
   height: 80px;
   object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  border: 1px solid #eef0f8;
 }
 
 .product-details {
@@ -473,7 +547,7 @@ onMounted(() => {
 
 .product-name {
   font-size: 14px;
-  color: #333;
+  color: #2d3142;
   margin-bottom: 8px;
   line-height: 1.5;
 }
@@ -488,30 +562,30 @@ onMounted(() => {
 
 .current-price {
   font-size: 18px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 .discount-tag {
   font-size: 12px;
-  color: #ff7730;
-  background: rgba(255, 119, 48, 0.1);
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* 小计 */
 .subtotal-price {
   font-size: 20px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 /* 底部结算栏 */
 .cart-footer {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
   margin-top: 20px;
   padding: 20px;
   display: flex;
@@ -533,14 +607,41 @@ onMounted(() => {
 
 .total-info {
   font-size: 14px;
-  color: #666;
+  color: #6b7280;
 }
 
 .total-count {
-  color: #ff7730;
+  color: #667eea;
   font-weight: bold;
   font-size: 18px;
   margin: 0 5px;
+}
+
+/* 会员折扣信息样式 */
+.member-discount-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border-radius: 8px;
+  border: 1px solid #fcd34d;
+}
+
+.member-tag {
+  font-weight: 600;
+}
+
+.original-price {
+  font-size: 13px;
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.saved-amount {
+  font-size: 13px;
+  color: #ef4444;
+  font-weight: 600;
 }
 
 .total-price-info {
@@ -551,24 +652,25 @@ onMounted(() => {
 
 .total-label {
   font-size: 14px;
-  color: #666;
+  color: #6b7280;
 }
 
 .total-price {
   font-size: 28px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 .checkout-btn {
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   padding: 12px 40px;
   font-size: 16px;
+  border-radius: 10px;
 }
 
 .checkout-btn:hover {
-  background: linear-gradient(135deg, #ff8c42 0%, #ff6620 100%);
+  background: linear-gradient(135deg, #5a6fd6 0%, #6b3f99 100%);
 }
 
 /* 响应式 */

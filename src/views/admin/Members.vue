@@ -11,10 +11,14 @@
     <el-card>
       <div class="filter-bar">
         <el-input v-model="query.memberCard" placeholder="会员卡号" style="width: 160px; margin-right: 10px;" clearable />
-        <el-select v-model="query.level" placeholder="会员等级" style="width: 140px; margin-right: 10px;" clearable>
-          <el-option label="普通会员" :value="1" />
-          <el-option label="银卡会员" :value="2" />
-          <el-option label="金卡会员" :value="3" />
+        <el-select v-model="query.level" placeholder="会员等级" style="width: 180px; margin-right: 10px;" clearable>
+          <el-option label="普通会员 (10折)" :value="0" />
+          <el-option 
+            v-for="level in memberLevels" 
+            :key="level.id" 
+            :label="`${level.levelName} (${(level.discount * 10).toFixed(1)}折)`" 
+            :value="level.level" 
+          />
         </el-select>
         <el-button type="primary" @click="handleSearch"><el-icon><Search /></el-icon>搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
@@ -29,6 +33,13 @@
         <el-table-column prop="memberLevel" label="会员等级" width="120">
           <template #default="scope">
             <el-tag :type="getLevelType(scope.row.level)">{{ scope.row.memberLevel }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="expireTime" label="过期时间" width="120">
+          <template #default="scope">
+            <span :class="{ 'expired-text': isExpired(scope.row.expireTime) }">
+              {{ formatExpireDate(scope.row.expireTime) }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="points" label="积分" width="100" />
@@ -89,17 +100,33 @@
       <el-form :model="levelForm" :rules="levelRules" ref="levelFormRef" label-width="100px">
         <el-form-item label="会员等级" prop="level">
           <el-select v-model="levelForm.level" placeholder="请选择等级" style="width: 100%" @change="handleLevelChange">
-            <el-option label="普通会员" :value="1" />
-            <el-option label="银卡会员" :value="2" />
-            <el-option label="金卡会员" :value="3" />
+            <el-option label="普通会员 (10折)" :value="0" />
+            <el-option 
+              v-for="level in memberLevels" 
+              :key="level.id" 
+              :label="`${level.levelName} (${(level.discount * 10).toFixed(1)}折)`" 
+              :value="level.level" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="会员折扣" prop="discount">
-          <el-input-number v-model="levelForm.discount" :precision="2" :step="0.05" :min="0" :max="1" style="width: 100%" />
-          <span style="margin-left: 10px; color: #909399;">0-1之间，如0.95=95折</span>
+          <el-input-number v-model="levelForm.discount" :precision="2" :step="0.05" :min="0" :max="1" style="width: 100%" disabled />
+          <span style="margin-left: 10px; color: #909399;">折扣由等级配置决定</span>
         </el-form-item>
         <el-form-item label="积分" prop="points">
           <el-input-number v-model="levelForm.points" :min="0" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="失效时间" prop="expireTime">
+          <el-date-picker
+            v-model="levelForm.expireTime"
+            type="datetime"
+            placeholder="选择失效时间"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+            :disabled="levelForm.level === 0"
+          />
+          <span style="margin-left: 10px; color: #909399;">普通会员无需设置失效时间</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -139,6 +166,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { getMemberPage, addMember, updateMemberLevel, getMemberDetail, deleteMember } from '@/api/member'
 import { getUserPage } from '@/api/userManage'
+import { getEnabledMemberLevels } from '@/api/memberLevel'
 
 const query = reactive({
   pageNum: 1,
@@ -157,6 +185,7 @@ const detailDialogVisible = ref(false)
 const saveLoading = ref(false)
 const detail = ref(null)
 const normalUsers = ref([])
+const memberLevels = ref([])
 
 const addFormRef = ref()
 const levelFormRef = ref()
@@ -170,7 +199,8 @@ const levelForm = reactive({
   level: null,
   memberLevel: '',
   discount: null,
-  points: null
+  points: null,
+  expireTime: null
 })
 
 const addRules = {
@@ -179,12 +209,52 @@ const addRules = {
 
 const levelRules = {
   level: [{ required: true, message: '请选择会员等级', trigger: 'change' }],
-  discount: [{ required: true, message: '请输入会员折扣', trigger: 'blur' }]
+  discount: [{ required: true, message: '请输入会员折扣', trigger: 'blur' }],
+  expireTime: [
+    { 
+      validator: (rule, value, callback) => {
+        // 如果是普通会员（level === 0），不需要验证失效时间
+        if (levelForm.level === 0) {
+          callback()
+        } else {
+          // 非普通会员必须选择失效时间
+          if (!value) {
+            callback(new Error('请选择失效时间'))
+          } else {
+            callback()
+          }
+        }
+      },
+      trigger: 'change'
+    }
+  ]
 }
 
 const getLevelType = (level) => {
-  const map = { 1: 'info', 2: 'warning', 3: 'success' }
+  const map = { 
+    0: 'info', // 普通会员 - 默认灰色
+    1: 'warning', // 等级1 - 蓝色
+    2: 'success', // 等级2 - 橙色
+    3: 'danger', // 等级3 - 绿色
+    // 4: 'danger' // 等级4 - 红色
+  }
   return map[level] || 'info'
+}
+
+// 格式化过期时间，只显示年月日
+const formatExpireDate = (dateStr) => {
+  if (!dateStr) return '永久有效'
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// 判断是否已过期
+const isExpired = (dateStr) => {
+  if (!dateStr) return false
+  return new Date(dateStr) < new Date()
 }
 
 const getList = async () => {
@@ -255,20 +325,42 @@ const showLevelDialog = (row) => {
     level: row.level,
     memberLevel: row.memberLevel,
     discount: row.discount,
-    points: row.points
+    points: row.points,
+    expireTime: row.expireTime
   })
   levelDialogVisible.value = true
 }
 
 const handleLevelChange = (val) => {
-  const levelMap = {
-    1: { name: '普通会员', discount: 1.0 },
-    2: { name: '银卡会员', discount: 0.95 },
-    3: { name: '金卡会员', discount: 0.9 }
+  // 等级为0表示普通会员
+  if (val === 0) {
+    levelForm.memberLevel = '普通会员'
+    levelForm.discount = 1
+    levelForm.expireTime = null // 普通会员无需失效时间
+  } else {
+    // 从会员等级配置中获取对应的等级信息
+    const selectedLevel = memberLevels.value.find(l => l.level === val)
+    if (selectedLevel) {
+      levelForm.memberLevel = selectedLevel.levelName
+      levelForm.discount = selectedLevel.discount
+    }
   }
-  levelForm.memberLevel = levelMap[val].name
-  levelForm.discount = levelMap[val].discount
-  levelForm.points = levelMap[val].points
+  // 触发表单验证，更新失效时间字段的验证状态
+  if (levelFormRef.value) {
+    levelFormRef.value.validateField('expireTime')
+  }
+}
+
+// 获取会员等级配置
+const loadMemberLevels = async () => {
+  try {
+    const res = await getEnabledMemberLevels()
+    if (res.code === 200) {
+      memberLevels.value = res.data || []
+    }
+  } catch (e) {
+    console.error('加载会员等级配置失败', e)
+  }
 }
 
 const handleUpdateLevel = async () => {
@@ -276,7 +368,26 @@ const handleUpdateLevel = async () => {
   try {
     await levelFormRef.value.validate()
     saveLoading.value = true
-    const res = await updateMemberLevel(levelForm)
+    
+    // 准备提交数据，确保日期格式正确
+    const submitData = {
+      ...levelForm
+    }
+    
+    // 如果有失效时间且格式不正确，进行转换
+    if (submitData.expireTime) {
+      // 如果是 Date 对象或其他格式，转换为 yyyy-MM-dd HH:mm:ss 格式
+      const date = new Date(submitData.expireTime)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      const seconds = String(date.getSeconds()).padStart(2, '0')
+      submitData.expireTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    }
+    
+    const res = await updateMemberLevel(submitData)
     if (res.code === 200) {
       ElMessage.success('调整成功')
       levelDialogVisible.value = false
@@ -311,6 +422,7 @@ const handleDelete = async (row) => {
 }
 
 onMounted(() => {
+  loadMemberLevels()
   getList()
 })
 </script>
@@ -343,6 +455,11 @@ onMounted(() => {
 }
 
 .price {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.expired-text {
   color: #f56c6c;
   font-weight: bold;
 }

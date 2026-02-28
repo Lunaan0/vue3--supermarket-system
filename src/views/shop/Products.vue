@@ -3,12 +3,20 @@
     <!-- 顶部导航栏 -->
     <div class="top-bar">
       <div class="container">
-        <div class="logo" @click="goToHome">超市商城</div>
+        <div class="top-bar-left">
+          <el-button class="back-btn" @click="goToHome" round>
+            <el-icon><ArrowLeft /></el-icon>
+            <span>返回首页</span>
+          </el-button>
+          <div class="logo" @click="goToHome">超市商城</div>
+        </div>
         <div class="search-box">
           <el-input 
             v-model="searchKeyword" 
-            placeholder="请输入商品名称搜索"
+            placeholder="搜索你想要的商品..."
+            clearable
             class="search-input"
+            @clear="clearSearch"
             @keyup.enter="handleSearch">
             <template #append>
               <el-button :icon="Search" @click="handleSearch" />
@@ -162,7 +170,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Search, ShoppingCart, View } from '@element-plus/icons-vue'
+import { Search, ShoppingCart, View, ArrowLeft } from '@element-plus/icons-vue'
 import { getCategoryTree } from '@/api/shopCategory'
 import { getProductPage } from '@/api/shopProduct'
 import { addToCart as addToCartApi, getCartList } from '@/api/cart'
@@ -376,7 +384,7 @@ onMounted(() => {
 <style scoped>
 .shop-products {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f5f7fc;
 }
 
 .container {
@@ -387,10 +395,10 @@ onMounted(() => {
 
 /* 顶部导航栏 */
 .top-bar {
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
+  background: linear-gradient(135deg, #667eea 0%, #9b8dd4 60%, #c4a0d4 100%);
   color: white;
   padding: 15px 0;
-  box-shadow: 0 2px 8px rgba(255, 119, 48, 0.2);
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.25);
 }
 
 .top-bar .container {
@@ -399,46 +407,85 @@ onMounted(() => {
   justify-content: space-between;
 }
 
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: white;
+  font-size: 13px;
+  padding: 6px 14px;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: white;
+}
+
 .logo {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 800;
   letter-spacing: 2px;
   cursor: pointer;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
 
 .search-box {
   flex: 1;
-  max-width: 500px;
+  max-width: 460px;
   margin: 0 40px;
 }
 
-.search-input {
-  --el-input-bg-color: rgba(255, 255, 255, 0.9);
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.search-input :deep(.el-input-group__append) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  border-radius: 0 10px 10px 0;
+}
+
+.search-input :deep(.el-input-group__append .el-button) {
+  color: white;
 }
 
 .user-info {
   font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.9;
 }
 
 /* 主体内容 */
 .main-content {
-  padding: 20px 0;
+  padding: 24px 0;
 }
 
 /* 筛选侧边栏 */
 .filter-sidebar {
   background: white;
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
 }
 
 .filter-title {
   font-size: 18px;
   margin: 0 0 15px 0;
-  color: #333;
+  color: #2d3142;
   padding-bottom: 10px;
-  border-bottom: 2px solid #ff7730;
+  border-bottom: 2px solid #667eea;
+  font-weight: 700;
 }
 
 .category-filter-menu {
@@ -451,16 +498,16 @@ onMounted(() => {
 }
 
 :deep(.el-menu-item.is-active) {
-  color: #ff7730;
-  background-color: rgba(255, 119, 48, 0.1);
+  color: #667eea;
+  background-color: rgba(102, 126, 234, 0.08);
 }
 
 /* 商品内容区 */
 .products-content {
   background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(100, 120, 180, 0.07);
   min-height: 500px;
 }
 
@@ -474,18 +521,18 @@ onMounted(() => {
 /* 商品卡片 */
 .product-card {
   background: white;
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
   margin-bottom: 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border: 1px solid #e0e0e0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #eef0f8;
 }
 
 .product-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 4px 16px rgba(255, 119, 48, 0.2);
-  border-color: #ff7730;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.16);
+  border-color: #a5b4fc;
 }
 
 .product-image {
@@ -493,18 +540,18 @@ onMounted(() => {
   width: 100%;
   height: 180px;
   overflow: hidden;
-  background: #f9f9f9;
+  background: #f5f6fa;
 }
 
 .product-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s ease;
 }
 
 .product-card:hover .product-image img {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .product-overlay {
@@ -513,7 +560,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(45, 49, 66, 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -534,7 +581,7 @@ onMounted(() => {
 }
 
 .product-info {
-  padding: 12px;
+  padding: 14px;
   min-height: 130px;
   display: flex;
   flex-direction: column;
@@ -542,18 +589,18 @@ onMounted(() => {
 
 .product-name {
   font-size: 14px;
-  color: #333;
+  color: #2d3142;
   margin-bottom: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: 600;
   height: 20px;
 }
 
 .product-desc {
   font-size: 12px;
-  color: #999;
+  color: #9a9eb8;
   margin-bottom: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -571,30 +618,42 @@ onMounted(() => {
 
 .current-price {
   font-size: 18px;
-  color: #ff7730;
-  font-weight: bold;
+  color: #e74860;
+  font-weight: 800;
 }
 
 .sales {
   font-size: 12px;
-  color: #999;
+  color: #b0b4c8;
 }
 
 .button-group {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
-.add-cart-btn,
+.add-cart-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  border-radius: 8px;
+}
+
+.add-cart-btn:hover {
+  background: linear-gradient(135deg, #5a6fd6 0%, #6b3f99 100%);
+}
+
 .buy-now-btn {
   flex: 1;
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
+  background: linear-gradient(135deg, #43cea2 0%, #3bb896 100%);
   border: none;
+  color: white;
+  border-radius: 8px;
 }
 
-.add-cart-btn:hover,
 .buy-now-btn:hover {
-  background: linear-gradient(135deg, #ff8c42 0%, #ff6620 100%);
+  background: linear-gradient(135deg, #38b892 0%, #2fa584 100%);
 }
 
 /* 分页 */
@@ -607,25 +666,25 @@ onMounted(() => {
 /* 购物车悬浮按钮 */
 .cart-float-btn {
   position: fixed;
-  right: 40px;
-  bottom: 40px;
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, #ff9a56 0%, #ff7730 100%);
-  border-radius: 50%;
+  right: 32px;
+  bottom: 100px;
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(255, 119, 48, 0.4);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
   transition: all 0.3s ease;
   z-index: 999;
   color: white;
 }
 
 .cart-float-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(255, 119, 48, 0.5);
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
 }
 
 .cart-badge {
@@ -635,19 +694,19 @@ onMounted(() => {
 }
 
 :deep(.el-badge__content) {
-  background-color: #ff3030;
+  background-color: #e74860;
 }
 
-/* 问题图标样式 */
+/* 查询图标样式 */
 :deep(.query-icon) {
   margin-left: 8px;
-  color: #ff7730;
+  color: #667eea;
   font-size: 22px;
   transition: color 0.3s, font-size 0.3s;
 }
 
 :deep(.query-icon:hover) {
-  color: #ff4500;
+  color: #764ba2;
   font-size: 22px;
 }
 
@@ -658,14 +717,22 @@ onMounted(() => {
   }
   
   .search-box {
-    margin: 0 20px;
+    margin: 0 16px;
   }
   
+  .top-bar-left {
+    gap: 8px;
+  }
+  
+  .back-btn span {
+    display: none;
+  }
+
   .cart-float-btn {
-    right: 20px;
-    bottom: 20px;
-    width: 50px;
-    height: 50px;
+    right: 16px;
+    bottom: 16px;
+    width: 46px;
+    height: 46px;
   }
 }
 </style>
